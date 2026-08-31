@@ -1,0 +1,31 @@
+name: sync
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - run: python synchronizer.py
+        env:
+          DB_CORE_HOST: ${{ secrets.DB_CORE_HOST }}
+          DB_CORE_PORT: ${{ secrets.DB_CORE_PORT }}
+          DB_CORE_USER: ${{ secrets.DB_CORE_USER }}
+          DB_CORE_PASS: ${{ secrets.DB_CORE_PASS }}
+          DB_CORE_NAME: ${{ secrets.DB_CORE_NAME }}
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_CATALOG: ${{ secrets.DATABRICKS_CATALOG }}
+          DATABRICKS_SCHEMA: ${{ secrets.DATABRICKS_SCHEMA }}
