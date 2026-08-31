@@ -24,8 +24,14 @@ jobs:
           DB_CORE_USER: ${{ secrets.DB_CORE_USER }}
           DB_CORE_PASS: ${{ secrets.DB_CORE_PASS }}
           DB_CORE_NAME: ${{ secrets.DB_CORE_NAME }}
+          DB_AUTH_HOST: ${{ secrets.DB_AUTH_HOST }}
+          DB_AUTH_PORT: ${{ secrets.DB_AUTH_PORT }}
+          DB_AUTH_USER: ${{ secrets.DB_AUTH_USER }}
+          DB_AUTH_PASS: ${{ secrets.DB_AUTH_PASS }}
+          DB_AUTH_NAME: ${{ secrets.DB_AUTH_NAME }}
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
           DATABRICKS_CATALOG: ${{ secrets.DATABRICKS_CATALOG }}
-          DATABRICKS_SCHEMA: ${{ secrets.DATABRICKS_SCHEMA }}
+          DATABRICKS_SCHEMA_CORE: ${{ secrets.DATABRICKS_SCHEMA_CORE }}
+          DATABRICKS_SCHEMA_AUTH: ${{ secrets.DATABRICKS_SCHEMA_AUTH }}
