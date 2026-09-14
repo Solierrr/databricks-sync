@@ -19,16 +19,12 @@ jobs:
 
       - run: python synchronizer.py
         env:
-          DB_CORE_HOST: ${{ secrets.DB_CORE_HOST }}
-          DB_CORE_PORT: ${{ secrets.DB_CORE_PORT }}
-          DB_CORE_USER: ${{ secrets.DB_CORE_USER }}
-          DB_CORE_PASS: ${{ secrets.DB_CORE_PASS }}
-          DB_CORE_NAME: ${{ secrets.DB_CORE_NAME }}
-          DB_AUTH_HOST: ${{ secrets.DB_AUTH_HOST }}
-          DB_AUTH_PORT: ${{ secrets.DB_AUTH_PORT }}
-          DB_AUTH_USER: ${{ secrets.DB_AUTH_USER }}
-          DB_AUTH_PASS: ${{ secrets.DB_AUTH_PASS }}
-          DB_AUTH_NAME: ${{ secrets.DB_AUTH_NAME }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_CORE: ${{ secrets.DB_CORE }}
+          DB_AUTH: ${{ secrets.DB_AUTH }}
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
