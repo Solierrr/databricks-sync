@@ -1,6 +1,6 @@
 # Finalidade do repositório
 
-O `databricks-sync` é um script Python de sincronização batch que replica os bancos Postgres operacionais da organização (o domínio `core` e o domínio `auth`) para a camada bronze de um Lakehouse Databricks. A cada execução, ele introspecta o `information_schema` de cada Postgres de origem, recria as tabelas de destino no Databricks com `CREATE OR REPLACE TABLE` traduzindo os tipos de coluna do Postgres para SQL do Databricks, e insere os dados lidos via `psycopg2` em lotes de 500 linhas com `executemany`. Não há API, servidor ou processo de longa duração aqui: é um job que roda do início ao fim e termina, disparado periodicamente por um workflow do GitHub Actions (`.github/workflows/sync.yml`), a cada 4 horas via `cron` ou manualmente via `workflow_dispatch`.
+O `databricks-sync` replica os bancos Postgres operacionais `core` e `auth` para os schemas Bronze de um Lakehouse Databricks. A sincronização completa é iniciada manualmente por uma API FastAPI local (`POST /sync`) ou pelo `workflow_dispatch` do GitHub Actions; não existe mais execução agendada. A API exige Bearer token e retorna um resumo com tabelas processadas e falhas.
 
 <p>
 
@@ -35,8 +35,8 @@ O `databricks-sync` é um script Python de sincronização batch que replica os 
 ## Aprofunde-se no Projeto!
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md), fluxo de sincronização e árvore do repositório.
-- [RUNNING.md](./RUNNING.md), como rodar o script localmente.
-- **Deployment**, este repositório **não segue** o fluxo padrão de deploy via `Dockerfile` + Docker Hub + ArgoCD/GKE descrito no [Deployment global](https://github.com/Solierrr/.github/blob/main/DEPLOYMENT.md) da organização — não existe `Dockerfile` aqui. A "publicação" é o próprio agendamento do workflow [`sync.yml`](./.github/workflows/sync.yml), que roda o script direto no runner do GitHub Actions a cada 4 horas (`cron: "0 */4 * * *"`) ou sob demanda via `workflow_dispatch`, sem etapa de build de imagem ou sincronização de cluster.
+- [RUNNING.md](./RUNNING.md), como iniciar a API localmente e chamar o endpoint manual.
+- **Deployment**, este repositório não publica um serviço hospedado: a API é iniciada localmente pelo Makefile. O workflow [`sync.yml`](./.github/workflows/sync.yml) mantém apenas um acionamento manual alternativo e não usa cron.
 
 ## Contribuindo
 

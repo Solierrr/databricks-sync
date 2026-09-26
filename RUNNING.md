@@ -1,54 +1,31 @@
-# Rodando o Projeto Localmente
+# Executando localmente
 
-Este repositório é Python, mas não é uma API: não há `uvicorn`, `FastAPI` nem processo escutando porta. É um script batch único que roda, sincroniza os dados e encerra. O processo local é: clonar, criar um ambiente virtual, instalar as dependências do `requirements.txt` e executar `python synchronizer.py` diretamente. Antes de iniciar, verifique a seção de impedimentos abaixo — o script depende inteiramente de credenciais externas (dois bancos Postgres e um workspace Databricks) mesmo em ambiente local, e falha imediatamente com `KeyError` se alguma variável obrigatória não estiver definida.
+O serviço disponibiliza uma API FastAPI para iniciar manualmente a sincronização completa dos bancos `core` e `auth` para a camada Bronze do Databricks. O servidor não dispara sincronizações automaticamente.
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python,postgresql,databricks,github" height="48" alt="Rodando o Projeto — Python">
-  </a>
-</p>
+## Requisitos
 
-## Possíveis Impedimentos
+- Python 3.12 ou superior
+- GNU Make
+- Acesso de rede aos Postgres e ao SQL Warehouse Databricks
+- Credenciais em `Inter/.env`, um nível acima deste repositório
 
-- **Python 3.12 instalado localmente**, a mesma versão usada no workflow do GitHub Actions (`.github/workflows/sync.yml`, `python-version: "3.12"`) — não há `Dockerfile` neste repositório, então rodar localmente depende diretamente da versão instalada na máquina.
-- **Acesso aos dois bancos Postgres de origem**, o script conecta via `psycopg2` com `sslmode="require"` em `DB_CORE_*` e `DB_AUTH_*`; sem rede/VPN até esses hosts e sem um usuário Postgres válido com acesso ao schema `public`, a conexão falha antes de qualquer sincronização.
-- **Acesso ao workspace Databricks**, o script conecta via SQL Warehouse (`databricks-sql-connector`) usando `DATABRICKS_HOST`, `DATABRICKS_HTTP_PATH` e `DATABRICKS_TOKEN`; o token precisa ter permissão de `CREATE SCHEMA`/`CREATE OR REPLACE TABLE` no catálogo definido em `DATABRICKS_CATALOG`.
-- **Arquivo `.env` fora da raiz do repositório**, o script carrega variáveis com `load_dotenv` a partir de `Path(__file__).resolve().parent.parent / ".env"` — ou seja, o `.env` precisa estar **um nível acima** da pasta `databricks-sync` (no diretório pai), não dentro dela. {a confirmar: motivo dessa convenção — provavelmente um `.env` compartilhado entre repositórios irmãos no monorepo/workspace local}.
-- **Secrets locais equivalentes aos do GitHub Actions**, em produção as credenciais (`DB_CORE_*`, `DB_AUTH_*`, `DATABRICKS_*`) vêm de GitHub Secrets injetados no workflow `sync.yml`; localmente elas precisam ser criadas manualmente no `.env` descrito acima.
+Copie as variáveis de [`.env.example`](./.env.example) para o `.env` local e preencha os acessos aos dois bancos, Databricks e um `SYNC_API_TOKEN` forte. Não coloque credenciais reais em arquivos versionados.
 
-## Instalação do Projeto
+## Iniciar
 
-### Iniciando o repositório com o Github
+Na pasta `databricks-sync`, instale as dependências e inicie a API:
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=github,vscode" height="48" alt="Frameworks">
-  </a>
-</p>
-
-Clone o repositório e abra no VS Code.
-
-```Comandos para clonar o repositório
-git clone https://github.com/Solierrr/databricks-sync.git
-cd ./databricks-sync
-code . -r
+```sh
+make setup
+make run
 ```
 
-### Instalando dependências necessárias para rodar o projeto localmente
+O servidor escuta em `0.0.0.0:8000` para permitir chamadas pela rede local. A documentação interativa OpenAPI fica em `http://localhost:8000/docs`.
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python" height="48" alt="Frameworks">
-  </a>
-</p>
+## Executar uma sincronização
 
-Crie um ambiente virtual antes de instalar as dependências, para não poluir o Python global da máquina. Antes de rodar, copie o `.env.example` para um `.env` **no diretório pai** do repositório (veja o impedimento acima) e preencha as credenciais dos dois bancos Postgres (`DB_CORE_*`, `DB_AUTH_*`) e do Databricks (`DATABRICKS_*`).
+Na interface `/docs`, abra `POST /sync`, selecione **Authorize**, informe o Bearer token definido por `SYNC_API_TOKEN` e execute a chamada. A requisição só termina quando a sincronização acabar. Se outra execução estiver em andamento, a API responde `409`.
 
-```Comandos para instalação de dependências
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python synchronizer.py
-```
+Uma resposta bem-sucedida resume as tabelas e linhas processadas. Se alguma tabela falhar, as demais continuam e a API retorna `500` com as tabelas que falharam. Como o sincronizador recria cada tabela com `CREATE OR REPLACE TABLE`, uma falha durante a carga pode deixar aquela tabela parcialmente preenchida; confira os detalhes da resposta antes de repetir.
 
-Ao rodar com sucesso, o script imprime no console o progresso da sincronização tabela a tabela (`ok  <tabela>: <n> linhas`) para cada uma das fontes definidas em `SOURCES`, encerrando com `Sincronizacao concluida.`.
+O workflow [`sync.yml`](./.github/workflows/sync.yml) também pode ser iniciado manualmente em GitHub Actions como alternativa. Ele não tem execução agendada.
