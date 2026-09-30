@@ -1,8 +1,6 @@
 name: Environment Status
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch: {}
 
 permissions:
@@ -13,8 +11,5 @@ jobs:
     uses: Solierrr/.github/.github/workflows/environment-status.yml@main
     with:
       environment: ALIVE
-      check: render
-      render_service_id: srv-das292t9fdbs73bid040
+      check: http
       url: https://databricks.solarianetwork.site
-    secrets:
-      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
