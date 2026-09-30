@@ -12,4 +12,4 @@ jobs:
     with:
       environment: ALIVE
       check: http
-      url: https://databricks.solarianetwork.site
+      url: https://databricks.solarianetwork.site/openapi.json
