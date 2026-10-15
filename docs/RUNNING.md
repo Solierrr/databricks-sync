@@ -16,8 +16,8 @@ Copie as variáveis de [`.env.example`](./.env.example) para o `.env` local e pr
 Na pasta `databricks-sync`, instale as dependências e inicie a API:
 
 ```sh
-make setup
-make run
+make install
+make dev
 ```
 
 O servidor escuta em `0.0.0.0:8000` para permitir chamadas pela rede local. A documentação interativa OpenAPI fica em `http://localhost:8000/docs`.
