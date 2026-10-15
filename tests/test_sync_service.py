@@ -65,8 +65,9 @@ def test_synchronize_raises_with_the_summary_when_a_source_fails():
     def factory(prefix):
         return FakeSource({"a": [(1, "x")]})
 
+    config = make_config()
     with pytest.raises(SyncExecutionError) as error:
-        synchronize(make_config(), factory, lambda config: FakeDbxConnection(cursor))
+        synchronize(config, factory, lambda _: FakeDbxConnection(cursor))
 
     summary = error.value.summary
     assert summary["status"] == "failed"

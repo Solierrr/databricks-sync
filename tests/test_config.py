@@ -33,8 +33,9 @@ def test_builds_sources_with_default_and_custom_schemas():
 
 @pytest.mark.parametrize("value", ["0", "-5", "many"])
 def test_rejects_invalid_batch_size(value):
+    env = full_env(SYNC_BATCH_SIZE=value)
     with pytest.raises(SyncConfigurationError):
-        load_config(full_env(SYNC_BATCH_SIZE=value))
+        load_config(env)
 
 
 def test_accepts_custom_batch_size():
