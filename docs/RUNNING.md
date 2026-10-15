@@ -9,7 +9,7 @@ O serviço disponibiliza uma API FastAPI para iniciar manualmente a sincronizaç
 - Acesso de rede aos Postgres e ao SQL Warehouse Databricks
 - Credenciais em `Inter/.env`, um nível acima deste repositório
 
-Copie as variáveis de [`.env.example`](./.env.example) para o `.env` local e preencha os acessos aos dois bancos, Databricks e um `SYNC_API_TOKEN` forte. Não coloque credenciais reais em arquivos versionados.
+Copie as variáveis de [`.env.example`](../.env.example) para o `.env` local e preencha os acessos aos dois bancos, Databricks e um `SYNC_API_TOKEN` forte. Não coloque credenciais reais em arquivos versionados.
 
 ## Iniciar
 
@@ -20,12 +20,22 @@ make install
 make dev
 ```
 
-O servidor escuta em `0.0.0.0:8000` para permitir chamadas pela rede local. A documentação interativa OpenAPI fica em `http://localhost:8000/docs`.
+O servidor escuta em `0.0.0.0:8000`. A documentação interativa OpenAPI fica em `http://localhost:8000/docs` e `GET /health` responde sem token (serve para acordar o serviço no Render gratuito).
 
 ## Executar uma sincronização
 
-Na interface `/docs`, abra `POST /sync`, selecione **Authorize**, informe o Bearer token definido por `SYNC_API_TOKEN` e execute a chamada. A requisição só termina quando a sincronização acabar. Se outra execução estiver em andamento, a API responde `409`.
+Na interface `/docs`, selecione **Authorize**, informe o Bearer token definido por `SYNC_API_TOKEN` e:
 
-Uma resposta bem-sucedida resume as tabelas e linhas processadas. Se alguma tabela falhar, as demais continuam e a API retorna `500` com as tabelas que falharam. Como o sincronizador recria cada tabela com `CREATE OR REPLACE TABLE`, uma falha durante a carga pode deixar aquela tabela parcialmente preenchida; confira os detalhes da resposta antes de repetir.
+1. Execute `POST /sync`. A resposta é `202` com o `id` da tarefa; se já houver uma em andamento, `409`; se faltar variável de ambiente, `503`.
+2. Chame `GET /sync/{id}` até o `status` deixar de ser `running`. O andamento mostra tabelas e linhas sincronizadas; ao final, `result` traz o resumo e, se alguma tabela falhou, os erros por tabela.
 
-O workflow [`sync.yml`](./.github/workflows/sync.yml) também pode ser iniciado manualmente em GitHub Actions como alternativa. Ele não tem execução agendada.
+`POST /sync?wait=true` mantém o comportamento antigo: a requisição só termina quando a sincronização acabar, com `200` e o resumo, ou `500` com as tabelas que falharam. Como cada tabela é recriada com `CREATE OR REPLACE TABLE`, uma falha durante a carga pode deixar aquela tabela parcialmente preenchida; confira os detalhes antes de repetir.
+
+O workflow [`sync.yml`](../.github/workflows/sync.yml) também pode ser iniciado manualmente em GitHub Actions como alternativa (`python synchronizer.py`). Ele não tem execução agendada.
+
+## Testes
+
+```sh
+make test   # pytest com bancos simulados
+make lint   # ruff
+```

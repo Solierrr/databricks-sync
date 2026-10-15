@@ -1,6 +1,6 @@
 # Finalidade do repositório
 
-O `databricks-sync` replica os bancos Postgres operacionais `core` e `auth` para os schemas Bronze de um Lakehouse Databricks. A sincronização completa é iniciada manualmente por uma API FastAPI local (`POST /sync`) ou pelo `workflow_dispatch` do GitHub Actions; não existe mais execução agendada. A API exige Bearer token e retorna um resumo com tabelas processadas e falhas.
+O `databricks-sync` replica os bancos Postgres operacionais `core` e `auth` para os schemas Bronze de um Lakehouse Databricks. A sincronização completa é iniciada manualmente por uma API FastAPI (`POST /sync`, que roda em segundo plano e tem `GET /sync/{id}` para o andamento) ou pelo `workflow_dispatch` do GitHub Actions; não existe mais execução agendada. A API exige Bearer token e o resumo final traz as tabelas processadas e as falhas.
 
 <p>
 
