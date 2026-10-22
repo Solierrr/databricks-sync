@@ -5,8 +5,25 @@ from app.auth import require_sync_token
 from app.config import load_config
 from app.errors import JobAlreadyRunning, SyncConfigurationError
 from app.models import JobAccepted, JobStatus, SyncError, SyncResult
+from gold_synchronizer import get_gold_configuration, synchronize_gold
 
 router = APIRouter(tags=["sync"], dependencies=[Depends(require_sync_token)])
+
+
+def _final_result(job):
+    if job.status == "completed":
+        return JSONResponse(status_code=200, content=job.result)
+    if job.result is not None:
+        return JSONResponse(status_code=500, content=job.result)
+    failure = SyncResult(
+        status="failed",
+        tables_total=0,
+        tables_synced=0,
+        rows_synced=0,
+        sources=[],
+        errors=[SyncError(source="databricks", message=job.error or "unknown error")],
+    )
+    return JSONResponse(status_code=500, content=failure.model_dump())
 
 
 @router.post(
@@ -47,19 +64,31 @@ def trigger_sync(request: Request, wait: bool = False):
     except JobAlreadyRunning as exc:
         raise HTTPException(status_code=409, detail="A synchronization is already running") from exc
 
-    if job.status == "completed":
-        return JSONResponse(status_code=200, content=job.result)
-    if job.result is not None:
-        return JSONResponse(status_code=500, content=job.result)
-    failure = SyncResult(
-        status="failed",
-        tables_total=0,
-        tables_synced=0,
-        rows_synced=0,
-        sources=[],
-        errors=[SyncError(source="databricks", message=job.error or "unknown error")],
-    )
-    return JSONResponse(status_code=500, content=failure.model_dump())
+    return _final_result(job)
+
+
+@router.post(
+    "/sync/gold",
+    response_model=SyncResult,
+    summary="Export Gold KPIs to AnalyticsDB",
+    responses={
+        401: {"description": "Bearer token is missing or invalid"},
+        409: {"description": "A synchronization is already running"},
+        500: {"model": SyncResult, "description": "The Gold export completed with errors"},
+        503: {"description": "The API token or Gold credentials are not configured"},
+    },
+)
+def trigger_gold_sync(request: Request):
+    try:
+        get_gold_configuration()
+    except SyncConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    try:
+        job = request.app.state.jobs.run_blocking(lambda _progress: synchronize_gold())
+    except JobAlreadyRunning as exc:
+        raise HTTPException(status_code=409, detail="A synchronization is already running") from exc
+    return _final_result(job)
 
 
 @router.get(

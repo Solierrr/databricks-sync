@@ -14,7 +14,7 @@ from databricks import sql as dbsql
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 
-from synchronizer import SyncConfigurationError, SyncExecutionError
+from app.errors import SyncConfigurationError, SyncExecutionError
 
 
 ROOT = Path(__file__).resolve().parent
