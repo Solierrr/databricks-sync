@@ -55,11 +55,6 @@ def get_sync_configuration() -> dict:
         "DB_CORE_USER",
         "DB_CORE_PASS",
         "DB_CORE_NAME",
-        "DB_AUTH_HOST",
-        "DB_AUTH_PORT",
-        "DB_AUTH_USER",
-        "DB_AUTH_PASS",
-        "DB_AUTH_NAME",
     ]
     missing = [name for name in required if not os.environ.get(name)]
     if missing:
@@ -72,7 +67,6 @@ def get_sync_configuration() -> dict:
         "dbx_catalog": os.environ["DATABRICKS_CATALOG"],
         "sources": [
             {"env_prefix": "DB_CORE", "dbx_schema": os.environ.get("DATABRICKS_SCHEMA_CORE", "bronze_core")},
-            {"env_prefix": "DB_AUTH", "dbx_schema": os.environ.get("DATABRICKS_SCHEMA_AUTH", "bronze_auth")},
         ],
     }
 

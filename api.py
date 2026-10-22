@@ -8,9 +8,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
 
+from gold_synchronizer import synchronize_gold
 from synchronizer import SyncConfigurationError, SyncExecutionError, synchronize
 
-app = FastAPI(title="Databricks Bronze Sync", version="1.0.0")
+app = FastAPI(title="Databricks Medallion Sync", version="1.1.0")
 bearer_scheme = HTTPBearer(auto_error=False)
 sync_lock = Lock()
 
@@ -54,23 +55,21 @@ def require_sync_token(
         )
 
 
-@app.post(
-    "/sync",
-    response_model=SyncResult,
-    responses={
-        401: {"description": "Bearer token is missing or invalid"},
-        409: {"description": "A synchronization is already running"},
-        500: {"model": SyncResult, "description": "The synchronization completed with errors"},
-        503: {"description": "The API token or sync credentials are not configured"},
-    },
-)
-def trigger_sync(_: None = Depends(require_sync_token)):
+SYNC_RESPONSES = {
+    401: {"description": "Bearer token is missing or invalid"},
+    409: {"description": "A synchronization is already running"},
+    500: {"model": SyncResult, "description": "The synchronization completed with errors"},
+    503: {"description": "The API token or sync credentials are not configured"},
+}
+
+
+def run_sync(sync_function):
     if not sync_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A synchronization is already running")
 
     try:
         try:
-            return synchronize()
+            return sync_function()
         except SyncConfigurationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except SyncExecutionError as exc:
@@ -87,3 +86,13 @@ def trigger_sync(_: None = Depends(require_sync_token)):
             return JSONResponse(status_code=500, content=result.model_dump())
     finally:
         sync_lock.release()
+
+
+@app.post("/sync", response_model=SyncResult, responses=SYNC_RESPONSES)
+def trigger_sync(_: None = Depends(require_sync_token)):
+    return run_sync(synchronize)
+
+
+@app.post("/sync/gold", response_model=SyncResult, responses=SYNC_RESPONSES)
+def trigger_gold_sync(_: None = Depends(require_sync_token)):
+    return run_sync(synchronize_gold)
