@@ -19,11 +19,6 @@ REQUIRED_VARIABLES = (
     "DB_CORE_USER",
     "DB_CORE_PASS",
     "DB_CORE_NAME",
-    "DB_AUTH_HOST",
-    "DB_AUTH_PORT",
-    "DB_AUTH_USER",
-    "DB_AUTH_PASS",
-    "DB_AUTH_NAME",
 )
 
 DEFAULT_BATCH_SIZE = 500
@@ -70,7 +65,6 @@ def load_config(environ: Mapping[str, str] | None = None) -> SyncConfig:
         dbx_catalog=env["DATABRICKS_CATALOG"],
         sources=(
             SourceConfig("DB_CORE", env.get("DATABRICKS_SCHEMA_CORE", "bronze_core")),
-            SourceConfig("DB_AUTH", env.get("DATABRICKS_SCHEMA_AUTH", "bronze_auth")),
         ),
         batch_size=batch_size,
     )

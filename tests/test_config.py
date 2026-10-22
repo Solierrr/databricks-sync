@@ -21,12 +21,11 @@ def test_reports_every_missing_variable():
     assert "DATABRICKS_TOKEN" in str(error.value)
 
 
-def test_builds_sources_with_default_and_custom_schemas():
-    config = load_config(full_env(DATABRICKS_SCHEMA_AUTH="auth_raw"))
+def test_builds_core_source_with_default_schema():
+    config = load_config(full_env())
     assert config.dbx_host == "dbx.example.com"
     assert [(s.env_prefix, s.dbx_schema) for s in config.sources] == [
         ("DB_CORE", "bronze_core"),
-        ("DB_AUTH", "auth_raw"),
     ]
     assert config.batch_size == 500
 

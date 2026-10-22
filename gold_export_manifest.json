@@ -1,0 +1,25 @@
+{
+  "catalog": "workspace",
+  "schema": "gold_core",
+  "tables": {
+    "kpi_admin_cadastros": {"scope": "ADMIN"},
+    "kpi_admin_modelos_status": {"scope": "ADMIN"},
+    "kpi_admin_propostas_status": {"scope": "ADMIN"},
+    "kpi_fornecedor_ofertas_status": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_estoque_modelo": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_ofertas_resumo": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_ofertas_detalhe": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_estoque_resumo": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_propostas_status": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_propostas_resumo": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_valor_aceito_produto": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_valor_aceito_mes": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_fornecedor_ofertas_aceitas_data": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_demandante_resumo": {"scope": "REQUESTER", "id_column": "requester_id"},
+    "kpi_demandante_propostas_status": {"scope": "REQUESTER", "id_column": "requester_id"},
+    "kpi_demandante_projetos_status": {"scope": "REQUESTER", "id_column": "requester_id"},
+    "kpi_profissional_resumo": {"scope": "PROFESSIONAL", "id_column": "technician_id"},
+    "kpi_profissional_servicos_status": {"scope": "PROFESSIONAL", "id_column": "technician_id"},
+    "kpi_profissional_avaliacoes": {"scope": "PROFESSIONAL", "id_column": "technician_id"}
+  }
+}

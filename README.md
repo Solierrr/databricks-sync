@@ -1,6 +1,6 @@
 # Finalidade do repositório
 
-O `databricks-sync` replica os bancos Postgres operacionais `core` e `auth` para os schemas Bronze de um Lakehouse Databricks. A sincronização completa é iniciada manualmente por uma API FastAPI (`POST /sync`, que roda em segundo plano e tem `GET /sync/{id}` para o andamento) ou pelo `workflow_dispatch` do GitHub Actions; não existe mais execução agendada. A API exige Bearer token e o resumo final traz as tabelas processadas e as falhas.
+O `databricks-sync` envia o CoreDB para `workspace.bronze_core` por `POST /sync` e exporta os KPIs já materializados em `workspace.gold_core` para o AnalyticsDB por `POST /sync/gold`. As pipelines Bronze → Silver → Gold pertencem ao `databricks-stocker`, cujo job chama a exportação após a conclusão bem-sucedida da Gold. Ambos os endpoints exigem o mesmo Bearer token. `authdb` não participa da carga Bronze.
 
 <p>
 
@@ -34,9 +34,10 @@ O `databricks-sync` replica os bancos Postgres operacionais `core` e `auth` para
 
 ## Aprofunde-se no Projeto!
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md), fluxo de sincronização e árvore do repositório.
-- [RUNNING.md](./RUNNING.md), como iniciar a API localmente e chamar o endpoint manual.
-- **Deployment**, este repositório não publica um serviço hospedado: a API é iniciada localmente pelo Makefile. O workflow [`sync.yml`](./.github/workflows/sync.yml) mantém apenas um acionamento manual alternativo e não usa cron.
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md), fluxo de sincronização.
+- [RUNNING.md](./docs/RUNNING.md), configuração da API local.
+- [GOLD.md](./docs/GOLD.md), views exportadas, contrato do AnalyticsDB e isolamento por principal.
+- **Deployment**, este repositório não publica um serviço hospedado: a API é iniciada localmente pelo Makefile. O workflow [`sync.yml`](./.github/workflows/sync.yml) mantém acionamento manual para Bronze; a exportação Gold é acionada pelo job do `databricks-stocker`.
 
 ## Contribuindo
 
