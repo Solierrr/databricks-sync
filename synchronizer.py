@@ -1,8 +1,4 @@
-import json
-import os
 import sys
-import uuid
-from pathlib import Path
 
 import psycopg2
 from databricks import sql as dbsql
@@ -192,63 +188,10 @@ def sync_source(dbx_conn, dbx_catalog: str, env_prefix: str, dbx_schema: str) ->
 
 
 def synchronize() -> dict:
-    config = get_sync_configuration()
-    source_results = []
-    errors = []
-
-    with dbsql.connect(
-        server_hostname=config["dbx_host"],
-        http_path=config["dbx_http_path"],
-        access_token=config["dbx_token"],
-    ) as dbx_conn:
-        for source in config["sources"]:
-            try:
-                result = sync_source(
-                    dbx_conn,
-                    config["dbx_catalog"],
-                    source["env_prefix"],
-                    source["dbx_schema"],
-                )
-                source_results.append(result)
-                errors.extend(result["errors"])
-            except Exception as exc:
-                errors.append({
-                    "source": source["env_prefix"],
-                    "dbx_schema": source["dbx_schema"],
-                    "table": None,
-                    "message": str(exc),
-                })
-
-    summary = {
-        "status": "failed" if errors else "completed",
-        "tables_total": sum(result["tables_total"] for result in source_results),
-        "tables_synced": sum(result["tables_synced"] for result in source_results),
-        "rows_synced": sum(result["rows_synced"] for result in source_results),
-        "sources": source_results,
-        "errors": errors,
-    }
-    if errors:
-        raise SyncExecutionError(summary)
-    return summary
+    return _synchronize(load_config())
 
 
-def main():
-    try:
-        result = synchronize()
-    except SyncConfigurationError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-    except SyncExecutionError as exc:
-        print(json.dumps(exc.summary, ensure_ascii=False), file=sys.stderr)
-        return 1
-    except Exception as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-
-    print(json.dumps(result, ensure_ascii=False))
-    print("Sincronizacao concluida.")
-    return 0
-
+__all__ = ["SyncConfigurationError", "SyncExecutionError", "main", "synchronize"]
 
 if __name__ == "__main__":
     sys.exit(main())

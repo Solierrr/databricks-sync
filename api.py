@@ -1,7 +1,4 @@
-import hmac
-import os
-from threading import Lock
-from typing import Literal
+from app.main import app
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
