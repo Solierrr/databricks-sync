@@ -2,6 +2,8 @@ import os
 import uuid
 from collections.abc import Iterator, Mapping
 
+EXPORT_SCHEMA = "export"
+
 
 class PostgresSource:
     def __init__(self, connection):
@@ -29,9 +31,10 @@ class PostgresSource:
             cur.execute(
                 """
                 SELECT table_name FROM information_schema.tables
-                WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                WHERE table_schema = %s AND table_type = 'VIEW'
                 ORDER BY table_name
-                """
+                """,
+                (EXPORT_SCHEMA,),
             )
             return [row[0] for row in cur.fetchall()]
         finally:
@@ -44,10 +47,10 @@ class PostgresSource:
                 """
                 SELECT column_name, data_type, numeric_precision, numeric_scale
                 FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = %s
+                WHERE table_schema = %s AND table_name = %s
                 ORDER BY ordinal_position
                 """,
-                (table,),
+                (EXPORT_SCHEMA, table),
             )
             return cur.fetchall()
         finally:
@@ -58,7 +61,7 @@ class PostgresSource:
         cur = self._conn.cursor(name=f"sync_{uuid.uuid4().hex}")
         cur.itersize = size
         try:
-            cur.execute(f'SELECT {quoted} FROM public."{table}"')
+            cur.execute(f'SELECT {quoted} FROM "{EXPORT_SCHEMA}"."{table}"')
             while True:
                 batch = cur.fetchmany(size)
                 if not batch:
