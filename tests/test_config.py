@@ -21,13 +21,28 @@ def test_reports_every_missing_variable():
     assert "DATABRICKS_TOKEN" in str(error.value)
 
 
-def test_builds_core_source_with_default_schema():
+def test_builds_core_and_auth_sources_with_default_schemas():
     config = load_config(full_env())
     assert config.dbx_host == "dbx.example.com"
     assert [(s.env_prefix, s.dbx_schema) for s in config.sources] == [
         ("DB_CORE", "bronze_core"),
+        ("DB_AUTH", "bronze_auth"),
     ]
     assert config.batch_size == 500
+
+
+def test_auth_source_is_restricted_to_the_allowlist():
+    core, auth = load_config(full_env()).sources
+    assert core.allowlist is None
+    assert auth.allowlist == ("auth_user", "federated_identity", "federated_provider_link")
+
+
+def test_catalog_and_schemas_come_from_the_environment():
+    config = load_config(
+        full_env(DATABRICKS_CATALOG="analyticsqa", DATABRICKS_SCHEMA_CORE="core_x", DATABRICKS_SCHEMA_AUTH="auth_x")
+    )
+    assert config.dbx_catalog == "analyticsqa"
+    assert [s.dbx_schema for s in config.sources] == ["core_x", "auth_x"]
 
 
 @pytest.mark.parametrize("value", ["0", "-5", "many"])

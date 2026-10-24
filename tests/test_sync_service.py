@@ -1,7 +1,7 @@
 import pytest
 
 from app.config import SourceConfig, SyncConfig
-from app.errors import SyncExecutionError
+from app.errors import SyncConfigurationError, SyncExecutionError
 from app.services.sync_service import sync_source, sync_table, synchronize
 from tests.fakes import FakeDbxConnection, FakeDbxCursor, FakeSource
 
@@ -41,6 +41,32 @@ def test_sync_source_collects_failures_and_keeps_going():
     assert source.rolled_back == 1
     assert source.closed
     assert [event["event"] for event in events] == ["source_started", "table_synced", "table_failed", "table_synced"]
+
+
+def test_sync_source_reads_only_allowlisted_views():
+    cursor = FakeDbxCursor()
+    source = FakeSource({"auth_user": [(1, "a")], "extra_view": [(2, "b")], "federated_identity": [(3, "c")]})
+
+    result = sync_source(
+        FakeDbxConnection(cursor), lambda prefix: source, "cat", SourceConfig("DB_AUTH", "bronze_auth", ("auth_user", "federated_identity")), 10
+    )
+
+    assert result["tables_total"] == 2
+    assert [error for error in result["errors"]] == []
+    assert not any("extra_view" in statement for statement in cursor.statements)
+
+
+def test_sync_source_fails_when_an_allowlisted_view_is_missing():
+    cursor = FakeDbxCursor()
+    source = FakeSource({"auth_user": [(1, "a")]})
+
+    with pytest.raises(SyncConfigurationError) as error:
+        sync_source(
+            FakeDbxConnection(cursor), lambda prefix: source, "cat", SourceConfig("DB_AUTH", "bronze_auth", ("auth_user", "federated_identity")), 10
+        )
+
+    assert "federated_identity" in str(error.value)
+    assert source.closed
 
 
 def make_config():
