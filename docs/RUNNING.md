@@ -2,8 +2,9 @@
 
 Configure `.env` no diretório pai do repositório a partir de `.env.example`.
 Preserve o `SYNC_API_TOKEN` existente. `POST /sync` usa credenciais de CoreDB
-e Databricks; `POST /sync/gold` usa credenciais do SQL Warehouse, do
-AnalyticsDB e o mesmo Bearer token.
+(`DB_CORE_*`), AuthDB (`DB_AUTH_*`), ambas do papel `ro_databricks`, e
+Databricks; `POST /sync/gold` usa credenciais do SQL Warehouse, do AnalyticsDB e
+o mesmo Bearer token.
 
 O comando `make run` inicia a API FastAPI. A documentação OpenAPI fica em
 `/docs`. Não execute os endpoints apenas para validar esta alteração: cada

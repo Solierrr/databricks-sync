@@ -1,11 +1,15 @@
 # Arquitetura
 
-`POST /sync` lê somente CoreDB e recria as tabelas em
-`workspace.bronze_core`. O `authdb` foi removido da lista de fontes Bronze.
+`POST /sync` lê somente as views do schema `export` (papel `ro_databricks`), nunca
+`public`. O CoreDB envia todas as views do schema para `<catálogo>.bronze_core`; o
+AuthDB envia só `auth_user`, `federated_identity` e `federated_provider_link` para
+`<catálogo>.bronze_auth`, e a carga falha se alguma delas não existir. O catálogo
+(`analytics`, ou `analyticsqa` em QA) vem de `DATABRICKS_CATALOG`.
 As pipelines Silver e Gold ficam no `databricks-stocker`.
 
 ```text
-CoreDB -> databricks-sync /sync -> workspace.bronze_core
+CoreDB export -> databricks-sync /sync -> <catálogo>.bronze_core
+AuthDB export -> databricks-sync /sync -> <catálogo>.bronze_auth
                                 -> Silver -> Gold (databricks-stocker)
                                             -> Databricks Job task
                                             -> databricks-sync /sync/gold
