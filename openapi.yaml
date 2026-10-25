@@ -1,0 +1,550 @@
+openapi: 3.1.0
+info:
+  title: Solaria — databricks-sync
+  description: 'Envia o CoreDB para a camada bronze do Databricks (`POST /sync`) e exporta os KPIs já materializados na camada
+    gold para o AnalyticsDB (`POST /sync/gold`). É acionado à mão e pelo job do `databricks-stocker`, sem horário fixo. Autentique
+    com o token de serviço `SYNC_API_TOKEN` no cabeçalho `Authorization: Bearer <token>`.'
+  contact:
+    name: Solaria
+    url: https://github.com/Solierrr
+  license:
+    name: CC0-1.0
+    url: https://creativecommons.org/publicdomain/zero/1.0/
+  version: 0.2.0 # x-release-please-version
+servers:
+- url: https://databricks.solarianetwork.site
+  description: Render
+- url: http://localhost:8000
+  description: Local
+paths:
+  /health:
+    get:
+      tags:
+      - Saúde
+      summary: Indica se o processo está vivo
+      description: Não consulta os bancos nem o Databricks.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '500':
+          description: Erro interno inesperado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security: []
+  /ready:
+    get:
+      tags:
+      - Saúde
+      summary: Indica se o serviço está pronto para atender
+      description: 'Confere, com timeout de 2 segundos cada, se o CoreDB, o AnalyticsDB (quando configurado) e o workspace
+        do Databricks estão alcançáveis. A checagem do Databricks usa a API REST do workspace e não liga o SQL Warehouse.
+        Responde 503 com `{"status": "DOWN"}` quando alguma dependência está fora do ar.'
+      operationId: getReady
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+        '500':
+          description: Erro interno inesperado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security: []
+  /sync:
+    post:
+      tags:
+      - Sincronização
+      summary: Inicia a carga bronze do CoreDB no Databricks
+      description: Inicia a sincronização em segundo plano e devolve o id do job; acompanhe em `GET /sync/{job_id}`. No plano
+        gratuito do Render a instância hiberna sem tráfego de entrada, então continue consultando o estado até o fim. Com
+        `wait=true` a requisição espera o fim e responde com o resumo final (200) ou com o erro e o resumo em `result` (500).
+        Só uma sincronização roda por vez.
+      operationId: startBronzeSync
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: wait
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Wait
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '200':
+          description: '`wait=true`: a sincronização terminou'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResult'
+        '401':
+          description: Token Bearer ausente ou inválido
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Já existe uma sincronização em andamento
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: A sincronização terminou com erros ou houve erro inesperado; com erros de tabela, o campo `result`
+            traz o resumo (`SyncResult`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: O token da API ou as credenciais da sincronização não estão configurados
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '422':
+          description: Parâmetro inválido
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - CONFLICT
+      - VALIDATION_FAILED
+      - INTERNAL_ERROR
+      - DEPENDENCY_UNAVAILABLE
+  /sync/gold:
+    post:
+      tags:
+      - Sincronização
+      summary: Exporta os KPIs da camada gold para o AnalyticsDB
+      description: Exporta as views revisadas de `gold_export_manifest.json` e espera o fim. Chamado pelo job do `databricks-stocker`
+        depois que a gold termina. Só uma sincronização roda por vez.
+      operationId: startGoldExport
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResult'
+        '401':
+          description: Token Bearer ausente ou inválido
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Já existe uma sincronização em andamento
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: A sincronização terminou com erros ou houve erro inesperado; com erros de tabela, o campo `result`
+            traz o resumo (`SyncResult`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: O token da API ou as credenciais da sincronização não estão configurados
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+      x-error-codes:
+      - UNAUTHENTICATED
+      - CONFLICT
+      - INTERNAL_ERROR
+      - DEPENDENCY_UNAVAILABLE
+  /sync/{job_id}:
+    get:
+      tags:
+      - Sincronização
+      summary: Consulta o estado de um job de sincronização
+      description: 'O histórico fica só na memória da instância: os jobs somem quando ela reinicia.'
+      operationId: getSyncJob
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Token Bearer ausente ou inválido
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Job não encontrado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: O token da API ou as credenciais da sincronização não estão configurados
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '422':
+          description: Parâmetro inválido
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: Erro interno inesperado
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - NOT_FOUND
+      - INTERNAL_ERROR
+      - DEPENDENCY_UNAVAILABLE
+components:
+  schemas:
+    HealthStatus:
+      properties:
+        status:
+          type: string
+          const: UP
+          title: Status
+          examples:
+          - UP
+        version:
+          type: string
+          title: Version
+          examples:
+          - 0.2.0
+      type: object
+      required:
+      - status
+      - version
+      title: HealthStatus
+    JobAccepted:
+      properties:
+        id:
+          type: string
+          title: Id
+        status:
+          type: string
+          const: running
+          title: Status
+        status_url:
+          type: string
+          title: Status Url
+      type: object
+      required:
+      - id
+      - status
+      - status_url
+      title: JobAccepted
+    JobProgress:
+      properties:
+        current_source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Current Source
+        tables_total:
+          type: integer
+          title: Tables Total
+          default: 0
+        tables_synced:
+          type: integer
+          title: Tables Synced
+          default: 0
+        tables_failed:
+          type: integer
+          title: Tables Failed
+          default: 0
+        rows_synced:
+          type: integer
+          title: Rows Synced
+          default: 0
+      type: object
+      title: JobProgress
+    JobStatus:
+      properties:
+        id:
+          type: string
+          title: Id
+        status:
+          type: string
+          enum:
+          - running
+          - completed
+          - failed
+          title: Status
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        progress:
+          $ref: '#/components/schemas/JobProgress'
+        result:
+          anyOf:
+          - $ref: '#/components/schemas/SyncResult'
+          - type: 'null'
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+      type: object
+      required:
+      - id
+      - status
+      - created_at
+      - progress
+      title: JobStatus
+    ReadinessStatus:
+      properties:
+        status:
+          type: string
+          enum:
+          - UP
+          - DOWN
+          title: Status
+          examples:
+          - UP
+      type: object
+      required:
+      - status
+      title: ReadinessStatus
+    SourceSyncResult:
+      properties:
+        source:
+          type: string
+          title: Source
+        dbx_schema:
+          type: string
+          title: Dbx Schema
+        tables_total:
+          type: integer
+          title: Tables Total
+        tables_synced:
+          type: integer
+          title: Tables Synced
+        rows_synced:
+          type: integer
+          title: Rows Synced
+        errors:
+          items:
+            $ref: '#/components/schemas/SyncError'
+          type: array
+          title: Errors
+      type: object
+      required:
+      - source
+      - dbx_schema
+      - tables_total
+      - tables_synced
+      - rows_synced
+      title: SourceSyncResult
+    SyncError:
+      properties:
+        source:
+          type: string
+          title: Source
+        dbx_schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dbx Schema
+        table:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Table
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - source
+      - message
+      title: SyncError
+    SyncResult:
+      properties:
+        status:
+          type: string
+          enum:
+          - completed
+          - failed
+          title: Status
+        tables_total:
+          type: integer
+          title: Tables Total
+        tables_synced:
+          type: integer
+          title: Tables Synced
+        rows_synced:
+          type: integer
+          title: Rows Synced
+        sources:
+          items:
+            $ref: '#/components/schemas/SourceSyncResult'
+          type: array
+          title: Sources
+        errors:
+          items:
+            $ref: '#/components/schemas/SyncError'
+          type: array
+          title: Errors
+      type: object
+      required:
+      - status
+      - tables_total
+      - tables_synced
+      - rows_synced
+      - sources
+      title: SyncResult
+    ProblemFieldError:
+      properties:
+        field:
+          description: Campo inválido
+          examples:
+          - wait
+          title: Field
+          type: string
+        errorCode:
+          description: Código estável do erro do campo
+          examples:
+          - VALIDATION_FAILED
+          title: Errorcode
+          type: string
+        detail:
+          description: Explicação para quem depura
+          examples:
+          - Input should be a valid boolean
+          title: Detail
+          type: string
+      required:
+      - field
+      - errorCode
+      - detail
+      title: ProblemFieldError
+      type: object
+    ProblemDetail:
+      properties:
+        type:
+          description: Sempre about:blank
+          examples:
+          - about:blank
+          title: Type
+          type: string
+        title:
+          description: O mesmo valor de errorCode
+          examples:
+          - CONFLICT
+          title: Title
+          type: string
+        status:
+          description: Código HTTP
+          examples:
+          - 409
+          title: Status
+          type: integer
+        errorCode:
+          description: Código estável do catálogo de erros
+          examples:
+          - CONFLICT
+          title: Errorcode
+          type: string
+        detail:
+          description: Explicação para quem depura; o front não exibe
+          examples:
+          - Já existe uma sincronização em andamento.
+          title: Detail
+          type: string
+        instance:
+          description: Caminho da requisição
+          examples:
+          - /sync
+          title: Instance
+          type: string
+        timestamp:
+          description: Momento do erro em UTC
+          format: date-time
+          title: Timestamp
+          type: string
+        traceId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          description: Id do trace, quando houver
+          title: Traceid
+        errors:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ProblemFieldError'
+            type: array
+          - type: 'null'
+          default: null
+          description: Erros por campo, só em validação
+          title: Errors
+      required:
+      - type
+      - title
+      - status
+      - errorCode
+      - detail
+      - instance
+      - timestamp
+      title: ProblemDetail
+      type: object
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: Token de serviço `SYNC_API_TOKEN`, enviado como Bearer. Não é um JWT do api-auth.
+      scheme: bearer
+tags:
+- name: Saúde
+  description: Vivo e pronto do serviço, sem autenticação
+- name: Sincronização
+  description: Carga bronze no Databricks e exportação gold para o AnalyticsDB
+security:
+- bearerAuth: []
