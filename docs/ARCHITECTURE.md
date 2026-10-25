@@ -13,7 +13,7 @@ AuthDB export -> databricks-sync /sync -> <catálogo>.bronze_auth
                                 -> Silver -> Gold (databricks-stocker)
                                             -> Databricks Job task
                                             -> databricks-sync /sync/gold
-                                            -> analyticsdb.analytics_gold
+                                            -> analyticsdb.gold
 ```
 
 O job de Databricks executa Silver, depois Gold e, após sucesso das duas,

@@ -1,6 +1,6 @@
 # Finalidade do repositório
 
-O `databricks-sync` envia as views do schema `export` do CoreDB para `<catálogo>.bronze_core` e as views liberadas do AuthDB para `<catálogo>.bronze_auth` por `POST /sync` (catálogo `analytics`, ou `analyticsqa` em QA, definido em `DATABRICKS_CATALOG`) e exporta os KPIs já materializados em `workspace.gold_core` para o AnalyticsDB por `POST /sync/gold`. As pipelines Bronze → Silver → Gold pertencem ao `databricks-stocker`, cujo job chama a exportação após a conclusão bem-sucedida da Gold. Ambos os endpoints exigem o mesmo Bearer token.
+O `databricks-sync` envia as views do schema `export` do CoreDB para `<catálogo>.bronze_core` e as views liberadas do AuthDB para `<catálogo>.bronze_auth` por `POST /sync` (catálogo `analytics`, ou `analyticsqa` em QA, definido em `DATABRICKS_CATALOG`) e exporta os KPIs já materializados em `<catálogo>.gold` para o AnalyticsDB por `POST /sync/gold`. As pipelines Bronze → Silver → Gold pertencem ao `databricks-stocker`, cujo job chama a exportação após a conclusão bem-sucedida da Gold. Ambos os endpoints exigem o mesmo Bearer token.
 
 <p>
 

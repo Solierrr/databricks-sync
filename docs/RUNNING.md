@@ -13,7 +13,7 @@ chamada inicia uma sincronização real.
 Para a exportação Gold, crie o banco com
 `make create TARGET=analytics ENVIRONMENT=prod` no `database-console` e aplique
 `make schema TARGET=analytics ENVIRONMENT=prod`. Cadastre as identidades de
-exportação e leitura em `analytics_gold.principal_access` e provisione o row
+exportação e leitura em `gold.principal_access` e provisione o row
 filter do Databricks conforme [GOLD.md](GOLD.md). Configure o job Silver → Gold
 → exportação do `databricks-stocker` com a URL da API e o token em segredos do
 Databricks. O job não é instalado automaticamente pelo repositório.

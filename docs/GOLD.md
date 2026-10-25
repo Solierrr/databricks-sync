@@ -1,10 +1,11 @@
 # Exportação Gold → AnalyticsDB
 
 `POST /sync/gold` lê somente as 19 views materializadas listadas em
-`gold_export_manifest.json`, no catálogo `workspace.gold_core` do
+`gold_export_manifest.json`, no schema `gold` do catálogo definido em
+`DATABRICKS_CATALOG` (`analytics`, ou `analyticsqa` em QA), do
 `databricks-stocker`. Ele não calcula KPIs e não lê entidades do AnalyticsDB
 para produzir Gold. As 11 views anteriores e as 8 novas views de fornecedor
-são copiadas para tabelas homônimas em `analyticsdb.analytics_gold`.
+são copiadas para tabelas homônimas em `analyticsdb.gold`.
 
 ## Ordem de execução
 
@@ -43,7 +44,7 @@ vazia e precisa receber vínculos validados para a identidade do pipeline, a
 identidade exportadora e os fornecedores.
 
 No AnalyticsDB, cada tabela exportada recebe PostgreSQL Row Level Security
-forçado. `analytics_gold.principal_access` mapeia o login real (`session_user`)
+forçado. `gold.principal_access` mapeia o login real (`session_user`)
 a ADMIN, EXPORTER, SUPPLIER, REQUESTER ou PROFESSIONAL. Identidades sem vínculo
 ativo e escopos com mais de uma entidade distinta não leem dados. O usuário
 que criou a função de autorização pode exportar; se o exportador for outro
