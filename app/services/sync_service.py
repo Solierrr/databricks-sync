@@ -3,7 +3,7 @@ from collections.abc import Callable
 from typing import Any
 
 from app.config import SourceConfig, SyncConfig
-from app.errors import SyncExecutionError
+from app.errors import SyncConfigurationError, SyncExecutionError
 from app.infra import databricks as databricks_infra
 from app.infra.postgres import PostgresSource
 from app.infra.typemap import sql_type_for, to_dbx_value
@@ -15,6 +15,19 @@ Progress = Callable[[dict], None]
 
 def _ignore(_: dict) -> None:
     return None
+
+
+def _exported_tables(source, source_config: SourceConfig) -> list[str]:
+    tables = source.tables()
+    allowlist = source_config.allowlist
+    if allowlist is None:
+        return tables
+    missing = [name for name in allowlist if name not in tables]
+    if missing:
+        raise SyncConfigurationError(
+            f"Export views missing for {source_config.env_prefix}: {', '.join(missing)}"
+        )
+    return [name for name in tables if name in allowlist]
 
 
 def sync_table(source, dbx_cur, dbx_catalog: str, dbx_schema: str, table: str, batch_size: int) -> int:
@@ -55,7 +68,7 @@ def sync_source(
 
     try:
         dbx_cur.execute(f"CREATE SCHEMA IF NOT EXISTS `{dbx_catalog}`.`{dbx_schema}`")
-        tables = source.tables()
+        tables = _exported_tables(source, source_config)
         logger.info("Synchronizing %d tables from %s to %s.%s", len(tables), env_prefix, dbx_catalog, dbx_schema)
         progress({"event": "source_started", "source": env_prefix, "tables": len(tables)})
 

@@ -19,7 +19,14 @@ REQUIRED_VARIABLES = (
     "DB_CORE_USER",
     "DB_CORE_PASS",
     "DB_CORE_NAME",
+    "DB_AUTH_HOST",
+    "DB_AUTH_PORT",
+    "DB_AUTH_USER",
+    "DB_AUTH_PASS",
+    "DB_AUTH_NAME",
 )
+
+AUTH_EXPORT_ALLOWLIST = ("auth_user", "federated_identity", "federated_provider_link")
 
 DEFAULT_BATCH_SIZE = 500
 
@@ -28,6 +35,7 @@ DEFAULT_BATCH_SIZE = 500
 class SourceConfig:
     env_prefix: str
     dbx_schema: str
+    allowlist: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -65,6 +73,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> SyncConfig:
         dbx_catalog=env["DATABRICKS_CATALOG"],
         sources=(
             SourceConfig("DB_CORE", env.get("DATABRICKS_SCHEMA_CORE", "bronze_core")),
+            SourceConfig("DB_AUTH", env.get("DATABRICKS_SCHEMA_AUTH", "bronze_auth"), AUTH_EXPORT_ALLOWLIST),
         ),
         batch_size=batch_size,
     )
