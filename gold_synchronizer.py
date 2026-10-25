@@ -1,4 +1,4 @@
-"""Export the materialized workspace.gold_core KPIs into analyticsdb."""
+"""Export the materialized analytics.gold KPIs into analyticsdb."""
 
 import json
 import os
@@ -67,6 +67,7 @@ def get_gold_configuration() -> dict:
         "DATABRICKS_HOST",
         "DATABRICKS_HTTP_PATH",
         "DATABRICKS_TOKEN",
+        "DATABRICKS_CATALOG",
         "DB_ANALYTICS_HOST",
         "DB_ANALYTICS_PORT",
         "DB_ANALYTICS_USER",
@@ -81,12 +82,8 @@ def get_gold_configuration() -> dict:
     manifest = json.loads(
         (ROOT / "gold_export_manifest.json").read_text(encoding="utf-8")
     )
-    catalog = _name(os.environ.get("DATABRICKS_CATALOG", manifest["catalog"]))
+    catalog = _name(os.environ["DATABRICKS_CATALOG"])
     source_schema = _name(os.environ.get("DATABRICKS_SCHEMA_GOLD", manifest["schema"]))
-    if (catalog, source_schema) != (manifest["catalog"], manifest["schema"]):
-        raise SyncConfigurationError(
-            "Gold source must match the reviewed export manifest"
-        )
     tables = manifest["tables"]
     for table, rule in tables.items():
         _name(table)
@@ -138,7 +135,7 @@ def _target_columns(cursor, table: str) -> list[tuple[str, str]]:
            FROM pg_catalog.pg_attribute a
            JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-           WHERE n.nspname = 'analytics_gold' AND c.relname = %s
+           WHERE n.nspname = 'gold' AND c.relname = %s
              AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum""",
         (table,),
     )
@@ -164,7 +161,7 @@ def _copy_value(value, kind: str):
 def _publish_table(
     pg_cursor, dbx_cursor, config: dict, table: str, rule: dict, columns
 ) -> int:
-    target = sql.Identifier("analytics_gold", table)
+    target = sql.Identifier("gold", table)
     staged = sql.Identifier(f"stage_{table}")
     definitions = sql.SQL(", ").join(
         sql.SQL("{} {}").format(sql.Identifier(name), sql.SQL(kind))
@@ -200,7 +197,7 @@ def _publish_table(
     expected = [(name, kind.replace(" ", "")) for name, kind in columns]
     if _target_columns(pg_cursor, table) != expected:
         raise SyncConfigurationError(
-            f"AnalyticsDB table analytics_gold.{table} differs from Gold; migration required"
+            f"AnalyticsDB table gold.{table} differs from Gold; migration required"
         )
     pg_cursor.execute(
         sql.SQL("ALTER TABLE {} ENABLE ROW LEVEL SECURITY").format(target)
@@ -208,9 +205,9 @@ def _publish_table(
     pg_cursor.execute(sql.SQL("ALTER TABLE {} FORCE ROW LEVEL SECURITY").format(target))
     pg_cursor.execute(sql.SQL("DROP POLICY IF EXISTS kpi_read ON {}").format(target))
     if rule["scope"] == "ADMIN":
-        allowed = sql.SQL("analytics_gold.can_read('ADMIN', '')")
+        allowed = sql.SQL("gold.can_read('ADMIN', '')")
     else:
-        allowed = sql.SQL("analytics_gold.can_read({}, {}::text)").format(
+        allowed = sql.SQL("gold.can_read({}, {}::text)").format(
             sql.Literal(rule["scope"]), sql.Identifier(rule["id_column"])
         )
     pg_cursor.execute(
@@ -263,7 +260,7 @@ def synchronize_gold() -> dict:
                     with pg_conn.cursor() as pg_cursor:
                         pg_cursor.execute("SELECT pg_advisory_xact_lock(731827491022)")
                         pg_cursor.execute(
-                            "SELECT to_regprocedure('analytics_gold.can_read(text,text)')"
+                            "SELECT to_regprocedure('gold.can_read(text,text)')"
                         )
                         if pg_cursor.fetchone()[0] is None:
                             raise SyncConfigurationError(
@@ -272,12 +269,12 @@ def synchronize_gold() -> dict:
                         if config["reader_role"]:
                             pg_cursor.execute(
                                 sql.SQL(
-                                    "GRANT USAGE ON SCHEMA analytics_gold TO {}"
+                                    "GRANT USAGE ON SCHEMA gold TO {}"
                                 ).format(sql.Identifier(config["reader_role"]))
                             )
                             pg_cursor.execute(
                                 sql.SQL(
-                                    "GRANT EXECUTE ON FUNCTION analytics_gold.can_read(TEXT, TEXT) TO {}"
+                                    "GRANT EXECUTE ON FUNCTION gold.can_read(TEXT, TEXT) TO {}"
                                 ).format(sql.Identifier(config["reader_role"]))
                             )
                         for table, rule in config["tables"].items():
@@ -304,7 +301,7 @@ def synchronize_gold() -> dict:
                 "errors": [
                     {
                         "source": "DATABRICKS_GOLD",
-                        "dbx_schema": "analytics_gold",
+                        "dbx_schema": "gold",
                         "table": current_table,
                         "message": str(exc),
                     }
@@ -313,7 +310,7 @@ def synchronize_gold() -> dict:
         ) from exc
     source = {
         "source": "DATABRICKS_GOLD",
-        "dbx_schema": "analytics_gold",
+        "dbx_schema": "gold",
         "tables_total": len(results),
         "tables_synced": len(results),
         "rows_synced": sum(row["rows_synced"] for row in results),
