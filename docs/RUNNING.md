@@ -21,3 +21,25 @@ As tabelas Gold exportadas e a política de tipos estão em
 `gold_export_manifest.json` e `gold_synchronizer.py`. O serviço falha diante
 de uma view ausente ou mudança de schema, sem substituir parcialmente o
 AnalyticsDB.
+
+## Contrato, erros e saúde
+
+O Swagger fica em `/docs` e o contrato em `/openapi.json`; `DOCS_ENABLED=false`
+desliga os dois. O contrato versionado (`openapi.yaml`) é gerado por
+`make openapi` e conferido no CI pelo lint de OpenAPI da organização: depois de
+mudar uma rota, rode o comando e versione o resultado. A versão vem de
+`version.txt`, atualizado pelo release-please junto com o `openapi.yaml`.
+
+Todo erro responde `application/problem+json` no contrato de erro da
+organização (`errorCode`, `detail`, `instance`, `timestamp`). Uma sincronização
+com `wait=true` que termina com erros responde 500 `INTERNAL_ERROR` com o resumo
+no campo `result`.
+
+`GET /health` responde se o processo está vivo, sem tocar nos bancos.
+`GET /ready` confere o CoreDB, o AnalyticsDB (quando `DB_ANALYTICS_HOST` está
+definido) e o workspace do Databricks, com timeout de 2 segundos cada, e
+responde 503 quando algum está fora. A checagem do Databricks usa a API REST do
+workspace e não liga o SQL Warehouse.
+
+`CORS_ALLOWED_ORIGINS` (separada por vírgula) libera as origens que abrem o
+contrato pelo navegador, como o `web-sandbox`.
