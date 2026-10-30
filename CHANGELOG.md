@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/Solierrr/databricks-sync/compare/v0.2.0...v0.3.0) (2026-10-30)
+
+
+### Features
+
+* export Gold KPIs to analyticsdb ([#17](https://github.com/Solierrr/databricks-sync/issues/17)) ([8c69ef6](https://github.com/Solierrr/databricks-sync/commit/8c69ef6e4017967f457c74b6b161fb8e00735767))
+* standardize the service contract ([#20](https://github.com/Solierrr/databricks-sync/issues/20)) ([c3c1c25](https://github.com/Solierrr/databricks-sync/commit/c3c1c251083c7f04784b041994e0361d450524f4))
+
 ## [0.2.0](https://github.com/Solierrr/databricks-sync/compare/v0.1.0...v0.2.0) (2026-09-30)
 
 
