@@ -1,45 +1,48 @@
-# Configuração local
+<p align="center">
+  <img src="../assets/readme/banners/databricks.png" alt="Databricks" width="100%">
+</p>
 
-Configure `.env` no diretório pai do repositório a partir de `.env.example`.
-Preserve o `SYNC_API_TOKEN` existente. `POST /sync` usa credenciais de CoreDB
-e Databricks; `POST /sync/gold` usa credenciais do SQL Warehouse, do
-AnalyticsDB e o mesmo Bearer token.
+# Execução local
 
-O comando `make run` inicia a API FastAPI. A documentação OpenAPI fica em
-`/docs`. Não execute os endpoints apenas para validar esta alteração: cada
-chamada inicia uma sincronização real.
+São necessários o Python 3.14, conforme o workflow de sincronização, além do pip, do make e de um shell, e o guia comum está em [Python](https://github.com/Solierrr/docs-warehouse/blob/main/readme/running/PYTHON.md). Esta main não tem Dockerfile.
 
-Para a exportação Gold, crie o banco com
-`make create TARGET=analytics ENVIRONMENT=prod` no `database-console` e aplique
-`make schema TARGET=analytics ENVIRONMENT=prod`. Cadastre as identidades de
-exportação e leitura em `analytics_gold.principal_access` e provisione o row
-filter do Databricks conforme [GOLD.md](GOLD.md). Configure o job Silver → Gold
-→ exportação do `databricks-stocker` com a URL da API e o token em segredos do
-Databricks. O job não é instalado automaticamente pelo repositório.
+## Preparar
 
-As tabelas Gold exportadas e a política de tipos estão em
-`gold_export_manifest.json` e `gold_synchronizer.py`. O serviço falha diante
-de uma view ausente ou mudança de schema, sem substituir parcialmente o
-AnalyticsDB.
+Executar no checkout do serviço.
 
-## Contrato, erros e saúde
+```bash
+make doctor
+make vault
+make install
+make dev
+```
 
-O Swagger fica em `/docs` e o contrato em `/openapi.json`; `DOCS_ENABLED=false`
-desliga os dois. O contrato versionado (`openapi.yaml`) é gerado por
-`make openapi` e conferido no CI pelo lint de OpenAPI da organização: depois de
-mudar uma rota, rode o comando e versione o resultado. A versão vem de
-`version.txt`, atualizado pelo release-please junto com o `openapi.yaml`.
+O `make vault` lê as pastas `/database` e `/databricks`, e a API carrega o `.env` sem substituir as variáveis já presentes no processo, iniciando na porta 8000. As credenciais devem ser obtidas pelo processo autorizado, sem que nenhum valor apareça em exemplos.
 
-Todo erro responde `application/problem+json` no contrato de erro da
-organização (`errorCode`, `detail`, `instance`, `timestamp`). Uma sincronização
-com `wait=true` que termina com erros responde 500 `INTERNAL_ERROR` com o resumo
-no campo `result`.
+| Variável | Papel |
+|---|---|
+| `SYNC_API_TOKEN` | Token Bearer dos endpoints de sincronização |
+| `DATABRICKS_HOST`, `DATABRICKS_HTTP_PATH`, `DATABRICKS_TOKEN`, `DATABRICKS_CATALOG` | Workspace e conexão SQL |
+| `DB_CORE_HOST`, `DB_CORE_PORT`, `DB_CORE_USER`, `DB_CORE_PASS`, `DB_CORE_NAME` | Origem Bronze |
+| `DATABRICKS_SCHEMA_CORE`, `SYNC_BATCH_SIZE` | Schema de destino e lote Bronze |
+| `DB_ANALYTICS_HOST`, `DB_ANALYTICS_PORT`, `DB_ANALYTICS_USER`, `DB_ANALYTICS_PASS`, `DB_ANALYTICS_NAME` | Destino Gold |
+| `DATABRICKS_SCHEMA_GOLD`, `GOLD_BATCH_SIZE` | Fonte e lote Gold |
+| `ANALYTICS_READER_ROLE` | Role leitora já existente, opcional |
+| `DOCS_ENABLED`, `CORS_ALLOWED_ORIGINS` | Documentação e origens do navegador |
 
-`GET /health` responde se o processo está vivo, sem tocar nos bancos.
-`GET /ready` confere o CoreDB, o AnalyticsDB (quando `DB_ANALYTICS_HOST` está
-definido) e o workspace do Databricks, com timeout de 2 segundos cada, e
-responde 503 quando algum está fora. A checagem do Databricks usa a API REST do
-workspace e não liga o SQL Warehouse.
+O lote Bronze padrão é 500 e deve ser positivo, a Gold admite lotes de 1 a 10000 e o catálogo e o schema Gold precisam coincidir com o manifesto, e não apenas apontar para um objeto existente.
 
-`CORS_ALLOWED_ORIGINS` (separada por vírgula) libera as origens que abrem o
-contrato pelo navegador, como o `web-sandbox`.
+## Verificar
+
+```bash
+make test
+make lint
+make build
+make openapi
+```
+
+Os alvos executam o pytest, o Ruff, o compileall e a exportação do contrato, mas o `make format` não tem comando configurado. Quando habilitado, o Swagger local fica em `http://localhost:8000/docs`.
+
+O `python synchronizer.py` inicia uma carga Bronze real, e o `python gold_synchronizer.py` inicia uma exportação Gold real com a configuração do ambiente, por isso esses comandos alteram os destinos e não servem como verificações sem efeito.
+
+O diagnóstico deve separar configuração ausente, token inválido, job ocupado e resultado parcial. Prontidão não substitui revisão do manifesto, da função de autorização e dos privilégios. Fontes em [Makefile](https://github.com/Solierrr/databricks-sync/blob/main/Makefile), [configuração](https://github.com/Solierrr/databricks-sync/blob/main/app/config.py) e [CLI](https://github.com/Solierrr/databricks-sync/blob/main/app/cli.py).
