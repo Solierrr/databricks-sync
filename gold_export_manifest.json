@@ -20,6 +20,13 @@
     "kpi_requester_projects_by_status": {"scope": "REQUESTER", "id_column": "requester_id"},
     "kpi_professional_summary": {"scope": "PROFESSIONAL", "id_column": "technician_id"},
     "kpi_professional_services_by_status": {"scope": "PROFESSIONAL", "id_column": "technician_id"},
-    "kpi_professional_reviews": {"scope": "PROFESSIONAL", "id_column": "technician_id"}
+    "kpi_professional_reviews": {"scope": "PROFESSIONAL", "id_column": "technician_id"},
+    "kpi_supplier_orders_summary": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_supplier_orders_by_status": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_supplier_sales_by_month": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_supplier_sales_by_model": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_supplier_subscription": {"scope": "SUPPLIER", "id_column": "supplier_id"},
+    "kpi_admin_orders_by_status": {"scope": "ADMIN"},
+    "kpi_admin_subscriptions_by_plan": {"scope": "ADMIN"}
   }
 }

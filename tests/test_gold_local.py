@@ -102,6 +102,6 @@ def test_manifest_matches_the_stocker_contract():
         gold.ROOT.joinpath("gold_export_manifest.json").read_text(encoding="utf-8")
     )
     assert (manifest["catalog"], manifest["schema"]) == ("analytics", "gold")
-    assert len(manifest["tables"]) == 19
+    assert len(manifest["tables"]) == 26
     scopes = {rule["scope"] for rule in manifest["tables"].values()}
     assert scopes == {"ADMIN", "SUPPLIER", "REQUESTER", "PROFESSIONAL"}
