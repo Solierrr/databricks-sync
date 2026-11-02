@@ -29,15 +29,22 @@ O exportador cria tabelas homônimas aos indicadores do manifesto no schema `gol
 | `kpi_professional_summary` | `PROFESSIONAL` | `technician_id` |
 | `kpi_professional_services_by_status` | `PROFESSIONAL` | `technician_id` |
 | `kpi_professional_reviews` | `PROFESSIONAL` | `technician_id` |
+| `kpi_supplier_orders_summary` | `SUPPLIER` | `supplier_id` |
+| `kpi_supplier_orders_by_status` | `SUPPLIER` | `supplier_id` |
+| `kpi_supplier_sales_by_month` | `SUPPLIER` | `supplier_id` |
+| `kpi_supplier_sales_by_model` | `SUPPLIER` | `supplier_id` |
+| `kpi_supplier_subscription` | `SUPPLIER` | `supplier_id` |
+| `kpi_admin_orders_by_status` | `ADMIN` | `sem identificador de entidade` |
+| `kpi_admin_subscriptions_by_plan` | `ADMIN` | `sem identificador de entidade` |
 
 O exportador não cria PK, FK nem índice de busca nessas tabelas, mas cria as colunas e os tipos, compara ordem e tipos com o destino existente e exige migração explícita quando há diferença.
 
 ```mermaid
 flowchart LR
-  V[19 fontes Gold do manifesto] --> T[Tabelas temporárias]
+  V[26 fontes Gold do manifesto] --> T[Tabelas temporárias]
   T --> C[Conferir colunas e tipos]
   C --> P[Uma transação PostgreSQL]
-  P --> A[19 tabelas gold]
+  P --> A[26 tabelas gold]
   F[Função can_read e principais externos] --> R[RLS forçado]
   R --> A
 ```
