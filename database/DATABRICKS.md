@@ -18,6 +18,6 @@ Inteiros, booleanos e datas mantêm os tipos correspondentes, e UUID, JSON, arra
 
 CREATE OR REPLACE acontece antes da carga em lotes. Falha pode deixar destino vazio ou parcial, enquanto outras tabelas concluem. Não há índice, chave estrangeira ou coordenação de snapshot criada aqui.
 
-A saída Gold está restrita ao catálogo e ao schema do manifesto, com 19 objetos, e o exportador não calcula esses objetos e rejeita uma configuração que diverge do manifesto. O contrato de referência é o publicado pelo `databricks-stocker`, e a adaptação do manifesto está pendente.
+A saída Gold está restrita ao catálogo e ao schema do manifesto, com 19 objetos, e o exportador não calcula esses objetos e rejeita uma configuração que diverge do manifesto. O contrato de referência é o publicado pelo `databricks-stocker`, que o manifesto já segue.
 
 Fontes em [descoberta PostgreSQL](https://github.com/Solierrr/databricks-sync/blob/main/app/infra/postgres.py), [conversão](https://github.com/Solierrr/databricks-sync/blob/main/app/infra/typemap.py) e [carga Bronze](https://github.com/Solierrr/databricks-sync/blob/main/app/services/sync_service.py).

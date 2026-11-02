@@ -32,6 +32,6 @@ sequenceDiagram
 
 ## Falhas e limites
 
-O exportador ainda não segue o contrato do produtor, que é a referência, por isso não basta executar o job. A transação preserva o destino PostgreSQL quando há falha, mas não congela a Gold de origem durante a exportação.
+O exportador segue o contrato do produtor. Sem o warehouse do Databricks, a exportação lê o JSON do executor local do stocker. A transação preserva o destino PostgreSQL quando há falha, mas não congela a Gold de origem durante a exportação.
 
 Fonte em [implementação](https://github.com/Solierrr/databricks-sync/blob/main/gold_synchronizer.py). O contexto está em [cópia analítica](https://github.com/Solierrr/docs-warehouse/blob/main/docs/flows/ANALYTICS_SYNC.md).
