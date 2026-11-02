@@ -13,7 +13,7 @@ sequenceDiagram
   participant D as Databricks
   participant G as AnalyticsDB
   P->>A: HTTP POST com Bearer de serviço
-  A->>D: SQL descrever as 26 fontes
+  A->>D: SQL descrever as 27 fontes
   alt Contrato inválido
     A-->>P: Erro sem publicar
   else Contrato válido

@@ -5,6 +5,7 @@
     "kpi_admin_registrations": {"scope": "ADMIN"},
     "kpi_admin_models_by_status": {"scope": "ADMIN"},
     "kpi_admin_proposals_by_status": {"scope": "ADMIN"},
+    "kpi_admin_demand_by_state": {"scope": "ADMIN"},
     "kpi_supplier_offers_by_status": {"scope": "SUPPLIER", "id_column": "supplier_id"},
     "kpi_supplier_stock_by_model": {"scope": "SUPPLIER", "id_column": "supplier_id"},
     "kpi_supplier_offers_summary": {"scope": "SUPPLIER", "id_column": "supplier_id"},

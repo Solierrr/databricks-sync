@@ -7,7 +7,7 @@
 Levantamento da main `c3c1c251`, em 2026-10-30.
 
 - Bronze copia somente CoreDB. O risco específico de copiar authdb inteiro do checklist não representa esta implementação (2026-10-30).
-- Há API, consulta de jobs, health, readiness, OpenAPI e exportação de 26 indicadores Gold (2026-10-30).
+- Há API, consulta de jobs, health, readiness, OpenAPI e exportação de 27 indicadores Gold (2026-11-02).
 - O manifesto segue o contrato do produtor: catálogo `analytics`, schema `gold` e nomes `kpi_supplier_*`, `kpi_requester_*` e `kpi_professional_*`. O destino é o schema `gold` do analyticsdb (2026-11-02).
 - A exportação também lê o JSON do executor local do stocker: `python gold_synchronizer.py --from-file gold_kpis.json`. Serve quando o warehouse do Databricks não sobe, por exemplo com créditos esgotados (2026-11-02).
 - O token fixo Bearer ainda difere do padrão de `X-Service-Key` por chamador, e a adoção desse padrão está pendente (2026-10-30).
