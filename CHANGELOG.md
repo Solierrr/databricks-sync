@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/Solierrr/databricks-sync/compare/v0.2.0...v0.3.0) (2026-11-02)
+
+
+### Features
+
+* export Gold KPIs to analyticsdb ([#17](https://github.com/Solierrr/databricks-sync/issues/17)) ([8c69ef6](https://github.com/Solierrr/databricks-sync/commit/8c69ef6e4017967f457c74b6b161fb8e00735767))
+* export the demand by state kpi ([#26](https://github.com/Solierrr/databricks-sync/issues/26)) ([13e67cb](https://github.com/Solierrr/databricks-sync/commit/13e67cb0025acbab75f864883f2d2df554df0471))
+* export the orders and subscriptions kpis ([#25](https://github.com/Solierrr/databricks-sync/issues/25)) ([a986a9f](https://github.com/Solierrr/databricks-sync/commit/a986a9fb1725e65868102f28a83daa6ae50dda52))
+* publish the gold kpis from a local pipeline run ([#24](https://github.com/Solierrr/databricks-sync/issues/24)) ([49aaf49](https://github.com/Solierrr/databricks-sync/commit/49aaf492f0d6cfc55c972efb8d6b4ecb873b543f))
+* standardize the service contract ([#20](https://github.com/Solierrr/databricks-sync/issues/20)) ([c3c1c25](https://github.com/Solierrr/databricks-sync/commit/c3c1c251083c7f04784b041994e0361d450524f4))
+
 ## [0.2.0](https://github.com/Solierrr/databricks-sync/compare/v0.1.0...v0.2.0) (2026-09-30)
 
 
