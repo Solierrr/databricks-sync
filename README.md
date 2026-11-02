@@ -29,7 +29,6 @@ FastAPI oferece os comandos de carga e consulta. PostgreSQL é a origem dos dado
 - [STATUS.md](./docs/STATUS.md), diferenças e limites verificados.
 - [Fluxos](./flows/), carga Bronze e exportação Gold.
 - [Dados](./database/), contratos de escrita no Databricks e no PostgreSQL.
-- [PENDENCIAS.md](./PENDENCIAS.md), confirmações do responsável.
 
 ## Contribuindo
 
