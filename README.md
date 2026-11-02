@@ -1,46 +1,38 @@
-# Finalidade do repositório
+<p align="center">
+  <img src="./assets/readme/banners/databricks.png" alt="Databricks" width="100%">
+</p>
 
-O `databricks-sync` envia o CoreDB para `workspace.bronze_core` por `POST /sync` e exporta os KPIs já materializados em `workspace.gold_core` para o AnalyticsDB por `POST /sync/gold`. As pipelines Bronze → Silver → Gold pertencem ao `databricks-stocker`, cujo job chama a exportação após a conclusão bem-sucedida da Gold. Ambos os endpoints exigem o mesmo Bearer token. `authdb` não participa da carga Bronze.
+<p align="center">
+  <img src="./assets/readme/stacks/python.png" width="100" hspace="8" alt="Python" title="Python">
+  <img src="./assets/readme/stacks/fastapi.png" width="100" hspace="8" alt="FastAPI" title="FastAPI">
+  <img src="./assets/readme/stacks/postgresql.png" width="100" hspace="8" alt="PostgreSQL" title="PostgreSQL">
+</p>
 
-<p>
+# Transporte dos dados analíticos
 
 [![License](https://img.shields.io/github/license/Solierrr/databricks-sync)](https://github.com/Solierrr/databricks-sync/blob/main/LICENSE)
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/Solierrr/databricks-sync)](https://github.com/Solierrr/databricks-sync/commits)
-[![GitHub Issues](https://img.shields.io/github/issues/Solierrr/databricks-sync)](https://github.com/Solierrr/databricks-sync/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Solierrr/databricks-sync)](https://github.com/Solierrr/databricks-sync/pulls)
-[![GitHub Contributors](https://img.shields.io/github/contributors/Solierrr/databricks-sync)](https://github.com/Solierrr/databricks-sync/graphs/contributors)
 [![Release](https://img.shields.io/github/v/release/Solierrr/databricks-sync)](https://github.com/Solierrr/databricks-sync/releases)
 
-</p>
+Este serviço copia dados de negócio para análise e devolve indicadores já calculados ao banco usado para consulta analítica. Ele atende à operação que prepara as cargas e acompanha seu resultado. A cópia não acompanha cada alteração em tempo real. Quem inicia uma execução recebe um identificador para acompanhar ou espera o resumo, com o resultado por tabela e as falhas encontradas.
 
-<div align="center">
-
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python,postgresql,githubactions,github" height="48" alt="Sincronização de Dados">
-  </a>
-</p>
-
-<p>
-
-[![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Databricks](https://img.shields.io/badge/Databricks-FF3621?logo=databricks&logoColor=white)](https://www.databricks.com/)
-[![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white)](https://github.com/features/actions)
-
-</p>
-
-</div>
+FastAPI oferece os comandos de carga e consulta. PostgreSQL é a origem dos dados de negócio e o destino dos indicadores, enquanto Databricks recebe a cópia inicial e fornece os resultados calculados pelo pipeline analítico. As chamadas exigem um token de serviço. O histórico de execuções fica na memória da instância e se perde quando o processo reinicia.
 
 ## Aprofunde-se no Projeto!
 
-- [ARCHITECTURE.md](./docs/ARCHITECTURE.md), fluxo de sincronização.
-- [RUNNING.md](./docs/RUNNING.md), configuração da API local.
-- [GOLD.md](./docs/GOLD.md), views exportadas, contrato do AnalyticsDB e isolamento por principal.
-- **Deployment**, este repositório não publica um serviço hospedado: a API é iniciada localmente pelo Makefile. O workflow [`sync.yml`](./.github/workflows/sync.yml) mantém acionamento manual para Bronze; a exportação Gold é acionada pelo job do `databricks-stocker`.
+- [OVERVIEW.md](./docs/OVERVIEW.md), finalidade e regras das cargas.
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md), componentes, concorrência e integrações.
+- [RUNNING.md](./docs/RUNNING.md), configuração e testes locais.
+- [API.md](./docs/API.md), autenticação, contrato e exemplos.
+- [DEPLOY.md](./docs/DEPLOY.md), execução manual e ambiente declarado.
+- [STATUS.md](./docs/STATUS.md), diferenças e limites verificados.
+- [Fluxos](./flows/), carga Bronze e exportação Gold.
+- [Dados](./database/), contratos de escrita no Databricks e no PostgreSQL.
+- [PENDENCIAS.md](./PENDENCIAS.md), confirmações do responsável.
 
 ## Contribuindo
 
-- [.github/CONTRIBUTING.md](./.github/CONTRIBUTING.md), convenções de commit, branch e Pull Request.
-- [.github/CODEOWNERS](./.github/CODEOWNERS), donos responsáveis por aprovar mudanças em cada caminho do repositório.
-- `CODE_OF_CONDUCT.md` e `SECURITY.md`, {a confirmar, não encontrados neste repositório no momento da escrita}.
+- [CONTRIBUTING.md](https://github.com/Solierrr/.github/blob/main/.github/CONTRIBUTING.md), convenções de contribuição.
+- [CODE_OF_CONDUCT.md](https://github.com/Solierrr/.github/blob/main/CODE_OF_CONDUCT.md), código de conduta.
+- [SECURITY.md](https://github.com/Solierrr/.github/blob/main/SECURITY.md), reporte de vulnerabilidade.
