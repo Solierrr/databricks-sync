@@ -30,7 +30,7 @@ flowchart LR
 | `app/services/sync_service.py` | Cópia de tabelas e resumo Bronze |
 | `app/infra/` | Drivers, conversão de tipos e prontidão |
 | `gold_synchronizer.py` | Manifesto, staging, RLS e transação Gold |
-| `gold_export_manifest.json` | Lista revisada de 26 indicadores |
+| `gold_export_manifest.json` | Lista revisada de 27 indicadores |
 | `synchronizer.py`, `api.py` | Entradas de compatibilidade para CLI e API |
 
 ## Autenticação e concorrência
@@ -43,7 +43,7 @@ O `JobManager` aceita uma execução por processo, compartilhada entre a Bronze 
 
 Bronze descobre tabelas `BASE TABLE` de `public`, consulta colunas e lê por cursor nomeado em lotes. O destino usa CREATE OR REPLACE antes da inserção. Erro numa tabela permite continuar as demais e resulta em resumo de falha, sem rollback global do Databricks.
 
-Gold descreve todas as fontes antes de escrever, verifica tipos e coluna de escopo e usa staging temporário. As 26 substituições ocorrem em uma transação PostgreSQL. Leitura das fontes Databricks não é snapshot transacional entre tabelas. Não atualizar Gold durante a exportação.
+Gold descreve todas as fontes antes de escrever, verifica tipos e coluna de escopo e usa staging temporário. As 27 substituições ocorrem em uma transação PostgreSQL. Leitura das fontes Databricks não é snapshot transacional entre tabelas. Não atualizar Gold durante a exportação.
 
 Os contratos estão em [DATABRICKS.md](../database/DATABRICKS.md) e [POSTGRES.md](../database/POSTGRES.md), e a função de autorização é provisionada antes no AnalyticsDB, de modo que o exportador aplica RLS forçado sobre a função e os principais já existentes.
 
