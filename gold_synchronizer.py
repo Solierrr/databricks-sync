@@ -1,11 +1,12 @@
-"""Export the materialized workspace.gold_core KPIs into analyticsdb."""
+"""Export the Gold KPIs into analyticsdb, from Databricks or from a local run of the pipeline."""
 
+import argparse
 import json
 import os
 import re
 import sys
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -16,8 +17,8 @@ from psycopg2.extras import execute_values
 
 from app.errors import SyncConfigurationError, SyncExecutionError
 
-
 ROOT = Path(__file__).resolve().parent
+TARGET_SCHEMA = "gold"
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*$")
 DECIMAL = re.compile(r"^DECIMAL\((\d+)\s*,\s*(\d+)\)$", re.IGNORECASE)
 TEXT_TYPE = re.compile(r"^(?:VARCHAR|CHAR)\(\d+\)$", re.IGNORECASE)
@@ -62,11 +63,10 @@ def _postgres_type(source_type: str) -> str:
     raise SyncConfigurationError(f"Unsupported Gold column type: {source_type}")
 
 
-def get_gold_configuration() -> dict:
+def get_gold_configuration(source: str = "databricks") -> dict:
+    databricks_keys = ("DATABRICKS_HOST", "DATABRICKS_HTTP_PATH", "DATABRICKS_TOKEN")
     required = (
-        "DATABRICKS_HOST",
-        "DATABRICKS_HTTP_PATH",
-        "DATABRICKS_TOKEN",
+        *(databricks_keys if source == "databricks" else ()),
         "DB_ANALYTICS_HOST",
         "DB_ANALYTICS_PORT",
         "DB_ANALYTICS_USER",
@@ -104,9 +104,11 @@ def get_gold_configuration() -> dict:
     if reader_role:
         _name(reader_role)
     return {
-        "host": os.environ["DATABRICKS_HOST"].removeprefix("https://").rstrip("/"),
-        "http_path": os.environ["DATABRICKS_HTTP_PATH"],
-        "token": os.environ["DATABRICKS_TOKEN"],
+        "host": os.environ.get("DATABRICKS_HOST", "")
+        .removeprefix("https://")
+        .rstrip("/"),
+        "http_path": os.environ.get("DATABRICKS_HTTP_PATH", ""),
+        "token": os.environ.get("DATABRICKS_TOKEN", ""),
         "catalog": catalog,
         "source_schema": source_schema,
         "tables": tables,
@@ -138,9 +140,9 @@ def _target_columns(cursor, table: str) -> list[tuple[str, str]]:
            FROM pg_catalog.pg_attribute a
            JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-           WHERE n.nspname = 'analytics_gold' AND c.relname = %s
+           WHERE n.nspname = %s AND c.relname = %s
              AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum""",
-        (table,),
+        (TARGET_SCHEMA, table),
     )
     return [(name, kind.lower().replace(" ", "")) for name, kind in cursor.fetchall()]
 
@@ -161,10 +163,65 @@ def _copy_value(value, kind: str):
     return value
 
 
+def _databricks_batches(dbx_cursor, config: dict, table: str, columns):
+    source = _source_name(config["catalog"], config["source_schema"], table)
+    dbx_cursor.execute(f"SELECT * FROM {source}")
+    names = [column[0] for column in dbx_cursor.description]
+    if names != [name for name, _ in columns]:
+        raise SyncConfigurationError(f"Gold schema changed during export: {table}")
+    while True:
+        rows = dbx_cursor.fetchmany(config["batch_size"])
+        if not rows:
+            return
+        yield [tuple(row) for row in rows]
+
+
+def _local_value(value, kind: str):
+    """Converts a value of the local pipeline JSON back to the type Databricks would return."""
+    if value is None:
+        return None
+    if kind.startswith("numeric("):
+        return Decimal(value)
+    if kind == "date":
+        return date.fromisoformat(value)
+    if kind.startswith("timestamp"):
+        return datetime.fromisoformat(value)
+    return value
+
+
+def _local_columns(data: dict, table: str, rule: dict) -> list[tuple[str, str]]:
+    schema = data.get("schemas", {}).get(table)
+    if not schema:
+        raise SyncConfigurationError(
+            f"The local Gold file has no column types for {table}; run the pipeline again"
+        )
+    names = [_name(name) for name, _ in schema]
+    if len(names) != len(set(names)):
+        raise SyncConfigurationError(f"Invalid Gold schema for {table}")
+    if rule.get("id_column") and rule["id_column"] not in names:
+        raise SyncConfigurationError(f"{table} does not contain {rule['id_column']}")
+    return [(name, _postgres_type(kind)) for name, kind in schema]
+
+
+def _local_batches(data: dict, config: dict, table: str, columns):
+    rows = data["tables"][table]
+    names = [name for name, _ in columns]
+    batch = []
+    for row in rows:
+        if list(row) != names:
+            raise SyncConfigurationError(f"Gold row layout changed in {table}")
+        batch.append(tuple(_local_value(row[name], kind) for name, kind in columns))
+        if len(batch) >= config["batch_size"]:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
 def _publish_table(
-    pg_cursor, dbx_cursor, config: dict, table: str, rule: dict, columns
+    pg_cursor, config: dict, table: str, rule: dict, columns, batches
 ) -> int:
-    target = sql.Identifier("analytics_gold", table)
+    target = sql.Identifier(TARGET_SCHEMA, table)
     staged = sql.Identifier(f"stage_{table}")
     definitions = sql.SQL(", ").join(
         sql.SQL("{} {}").format(sql.Identifier(name), sql.SQL(kind))
@@ -173,21 +230,13 @@ def _publish_table(
     pg_cursor.execute(
         sql.SQL("CREATE TEMP TABLE {} ({}) ON COMMIT DROP").format(staged, definitions)
     )
-    source = _source_name(config["catalog"], config["source_schema"], table)
-    dbx_cursor.execute(f"SELECT * FROM {source}")
-    names = [column[0] for column in dbx_cursor.description]
-    if names != [name for name, _ in columns]:
-        raise SyncConfigurationError(f"Gold schema changed during export: {table}")
     insert = (
         sql.SQL("INSERT INTO {} ({}) VALUES %s")
         .format(staged, sql.SQL(", ").join(sql.Identifier(name) for name, _ in columns))
         .as_string(pg_cursor.connection)
     )
     count = 0
-    while True:
-        rows = dbx_cursor.fetchmany(config["batch_size"])
-        if not rows:
-            break
+    for rows in batches:
         batch = [
             tuple(_copy_value(value, kind) for value, (_, kind) in zip(row, columns))
             for row in rows
@@ -200,7 +249,7 @@ def _publish_table(
     expected = [(name, kind.replace(" ", "")) for name, kind in columns]
     if _target_columns(pg_cursor, table) != expected:
         raise SyncConfigurationError(
-            f"AnalyticsDB table analytics_gold.{table} differs from Gold; migration required"
+            f"AnalyticsDB table gold.{table} differs from Gold; migration required"
         )
     pg_cursor.execute(
         sql.SQL("ALTER TABLE {} ENABLE ROW LEVEL SECURITY").format(target)
@@ -208,9 +257,9 @@ def _publish_table(
     pg_cursor.execute(sql.SQL("ALTER TABLE {} FORCE ROW LEVEL SECURITY").format(target))
     pg_cursor.execute(sql.SQL("DROP POLICY IF EXISTS kpi_read ON {}").format(target))
     if rule["scope"] == "ADMIN":
-        allowed = sql.SQL("analytics_gold.can_read('ADMIN', '')")
+        allowed = sql.SQL("gold.can_read('ADMIN', '')")
     else:
-        allowed = sql.SQL("analytics_gold.can_read({}, {}::text)").format(
+        allowed = sql.SQL("gold.can_read({}, {}::text)").format(
             sql.Literal(rule["scope"]), sql.Identifier(rule["id_column"])
         )
     pg_cursor.execute(
@@ -229,91 +278,86 @@ def _publish_table(
     return count
 
 
-def synchronize_gold() -> dict:
-    config = get_gold_configuration()
-    results = []
-    current_table = None
-    try:
-        with closing(
-            dbsql.connect(
-                server_hostname=config["host"],
-                http_path=config["http_path"],
-                access_token=config["token"],
+def _record_load(
+    pg_cursor, config: dict, source: str, generated_at: datetime | None
+) -> None:
+    """Keeps one row with when the data was loaded and where it came from; the dashboards show it."""
+    pg_cursor.execute(
+        "CREATE TABLE IF NOT EXISTS gold.load_info (source text NOT NULL, loaded_at timestamptz NOT NULL, "
+        "generated_at timestamptz)"
+    )
+    pg_cursor.execute("TRUNCATE TABLE gold.load_info")
+    pg_cursor.execute(
+        "INSERT INTO gold.load_info (source, loaded_at, generated_at) VALUES (%s, now(), %s)",
+        (source, generated_at),
+    )
+    if config["reader_role"]:
+        pg_cursor.execute(
+            sql.SQL("GRANT SELECT ON gold.load_info TO {}").format(
+                sql.Identifier(config["reader_role"])
             )
-        ) as dbx_conn:
-            with closing(dbx_conn.cursor()) as dbx_cursor:
-                columns_by_table = {
-                    table: _describe(dbx_cursor, config, table, rule)
-                    for table, rule in config["tables"].items()
-                }
-                with (
-                    closing(
-                        psycopg2.connect(
-                            host=os.environ["DB_ANALYTICS_HOST"],
-                            port=os.environ["DB_ANALYTICS_PORT"],
-                            dbname=os.environ["DB_ANALYTICS_NAME"],
-                            user=os.environ["DB_ANALYTICS_USER"],
-                            password=os.environ["DB_ANALYTICS_PASS"],
-                            sslmode="require",
-                            application_name="databricks-sync-gold-export",
-                        )
-                    ) as pg_conn,
-                    pg_conn,
-                ):
-                    with pg_conn.cursor() as pg_cursor:
-                        pg_cursor.execute("SELECT pg_advisory_xact_lock(731827491022)")
-                        pg_cursor.execute(
-                            "SELECT to_regprocedure('analytics_gold.can_read(text,text)')"
-                        )
-                        if pg_cursor.fetchone()[0] is None:
-                            raise SyncConfigurationError(
-                                "Create the AnalyticsDB schema with database-console/db/analytics/schema.sql first"
-                            )
-                        if config["reader_role"]:
-                            pg_cursor.execute(
-                                sql.SQL(
-                                    "GRANT USAGE ON SCHEMA analytics_gold TO {}"
-                                ).format(sql.Identifier(config["reader_role"]))
-                            )
-                            pg_cursor.execute(
-                                sql.SQL(
-                                    "GRANT EXECUTE ON FUNCTION analytics_gold.can_read(TEXT, TEXT) TO {}"
-                                ).format(sql.Identifier(config["reader_role"]))
-                            )
-                        for table, rule in config["tables"].items():
-                            current_table = table
-                            count = _publish_table(
-                                pg_cursor,
-                                dbx_cursor,
-                                config,
-                                table,
-                                rule,
-                                columns_by_table[table],
-                            )
-                            results.append({"table": table, "rows_synced": count})
-    except SyncConfigurationError:
-        raise
-    except Exception as exc:
-        raise SyncExecutionError(
-            {
-                "status": "failed",
-                "tables_total": len(config["tables"]),
-                "tables_synced": 0,
-                "rows_synced": 0,
-                "sources": [],
-                "errors": [
-                    {
-                        "source": "DATABRICKS_GOLD",
-                        "dbx_schema": "analytics_gold",
-                        "table": current_table,
-                        "message": str(exc),
-                    }
-                ],
-            }
-        ) from exc
+        )
+
+
+def _publish_all(
+    config: dict,
+    columns_by_table: dict,
+    batches_for,
+    source: str,
+    generated_at: datetime | None = None,
+) -> list[dict]:
+    """Publishes every table in one PostgreSQL transaction; any failure rolls all of them back."""
+    results = []
+    with (
+        closing(
+            psycopg2.connect(
+                host=os.environ["DB_ANALYTICS_HOST"],
+                port=os.environ["DB_ANALYTICS_PORT"],
+                dbname=os.environ["DB_ANALYTICS_NAME"],
+                user=os.environ["DB_ANALYTICS_USER"],
+                password=os.environ["DB_ANALYTICS_PASS"],
+                sslmode="require",
+                application_name="databricks-sync-gold-export",
+            )
+        ) as pg_conn,
+        pg_conn,
+        pg_conn.cursor() as pg_cursor,
+    ):
+        pg_cursor.execute("SELECT pg_advisory_xact_lock(731827491022)")
+        pg_cursor.execute("SELECT to_regprocedure('gold.can_read(text,text)')")
+        if pg_cursor.fetchone()[0] is None:
+            raise SyncConfigurationError(
+                "Create the AnalyticsDB schema with database-console/db/analytics/schema.sql first"
+            )
+        if config["reader_role"]:
+            pg_cursor.execute(
+                sql.SQL("GRANT USAGE ON SCHEMA gold TO {}").format(
+                    sql.Identifier(config["reader_role"])
+                )
+            )
+            pg_cursor.execute(
+                sql.SQL(
+                    "GRANT EXECUTE ON FUNCTION gold.can_read(TEXT, TEXT) TO {}"
+                ).format(sql.Identifier(config["reader_role"]))
+            )
+        for table, rule in config["tables"].items():
+            count = _publish_table(
+                pg_cursor,
+                config,
+                table,
+                rule,
+                columns_by_table[table],
+                batches_for(table, columns_by_table[table]),
+            )
+            results.append({"table": table, "rows_synced": count})
+        _record_load(pg_cursor, config, source, generated_at)
+    return results
+
+
+def _summary(results: list[dict], source_name: str) -> dict:
     source = {
-        "source": "DATABRICKS_GOLD",
-        "dbx_schema": "analytics_gold",
+        "source": source_name,
+        "dbx_schema": "gold",
         "tables_total": len(results),
         "tables_synced": len(results),
         "rows_synced": sum(row["rows_synced"] for row in results),
@@ -329,9 +373,108 @@ def synchronize_gold() -> dict:
     }
 
 
-def main() -> int:
+def _failure(config: dict, source_name: str, exc: Exception) -> SyncExecutionError:
+    return SyncExecutionError(
+        {
+            "status": "failed",
+            "tables_total": len(config["tables"]),
+            "tables_synced": 0,
+            "rows_synced": 0,
+            "sources": [],
+            "errors": [
+                {
+                    "source": source_name,
+                    "dbx_schema": "gold",
+                    "table": None,
+                    "message": str(exc),
+                }
+            ],
+        }
+    )
+
+
+def synchronize_gold() -> dict:
+    config = get_gold_configuration()
     try:
-        print(json.dumps(synchronize_gold(), ensure_ascii=False))
+        with (
+            closing(
+                dbsql.connect(
+                    server_hostname=config["host"],
+                    http_path=config["http_path"],
+                    access_token=config["token"],
+                )
+            ) as dbx_conn,
+            closing(dbx_conn.cursor()) as dbx_cursor,
+        ):
+            columns_by_table = {
+                table: _describe(dbx_cursor, config, table, rule)
+                for table, rule in config["tables"].items()
+            }
+            results = _publish_all(
+                config,
+                columns_by_table,
+                lambda table, columns: _databricks_batches(
+                    dbx_cursor, config, table, columns
+                ),
+                "DATABRICKS",
+            )
+    except SyncConfigurationError:
+        raise
+    except Exception as exc:
+        raise _failure(config, "DATABRICKS_GOLD", exc) from exc
+    return _summary(results, "DATABRICKS_GOLD")
+
+
+def _generated_at(data: dict) -> datetime | None:
+    value = data.get("metadata", {}).get("generated_at")
+    return datetime.fromisoformat(value) if value else None
+
+
+def synchronize_gold_from_file(path: Path) -> dict:
+    """Same publication as `synchronize_gold`, reading the JSON that the local pipeline produced."""
+    config = get_gold_configuration(source="local")
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        missing = [
+            table for table in config["tables"] if table not in data.get("tables", {})
+        ]
+        if missing:
+            raise SyncConfigurationError(
+                f"The local Gold file is missing: {', '.join(missing)}"
+            )
+        columns_by_table = {
+            table: _local_columns(data, table, rule)
+            for table, rule in config["tables"].items()
+        }
+        results = _publish_all(
+            config,
+            columns_by_table,
+            lambda table, columns: _local_batches(data, config, table, columns),
+            "LOCAL",
+            _generated_at(data),
+        )
+    except SyncConfigurationError:
+        raise
+    except Exception as exc:
+        raise _failure(config, "LOCAL_GOLD", exc) from exc
+    return _summary(results, "LOCAL_GOLD")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--from-file",
+        type=Path,
+        help="Gold JSON written by databricks-stocker/run_local.py; skips Databricks",
+    )
+    args = parser.parse_args(argv)
+    try:
+        result = (
+            synchronize_gold_from_file(args.from_file)
+            if args.from_file
+            else synchronize_gold()
+        )
+        print(json.dumps(result, ensure_ascii=False))
         return 0
     except SyncConfigurationError as exc:
         print(str(exc), file=sys.stderr)

@@ -43,6 +43,6 @@ make openapi
 
 Os alvos executam o pytest, o Ruff, o compileall e a exportação do contrato, mas o `make format` não tem comando configurado. Quando habilitado, o Swagger local fica em `http://localhost:8000/docs`.
 
-O `python synchronizer.py` inicia uma carga Bronze real, e o `python gold_synchronizer.py` inicia uma exportação Gold real com a configuração do ambiente, por isso esses comandos alteram os destinos e não servem como verificações sem efeito.
+O `python synchronizer.py` inicia uma carga Bronze real, e o `python gold_synchronizer.py` inicia uma exportação Gold real com a configuração do ambiente, por isso esses comandos alteram os destinos e não servem como verificações sem efeito. Sem Databricks, `python gold_synchronizer.py --from-file <gold_kpis.json>` publica o JSON gerado por `run_local.py` do databricks-stocker, e só exige as variáveis `DB_ANALYTICS_*`.
 
 O diagnóstico deve separar configuração ausente, token inválido, job ocupado e resultado parcial. Prontidão não substitui revisão do manifesto, da função de autorização e dos privilégios. Fontes em [Makefile](https://github.com/Solierrr/databricks-sync/blob/main/Makefile), [configuração](https://github.com/Solierrr/databricks-sync/blob/main/app/config.py) e [CLI](https://github.com/Solierrr/databricks-sync/blob/main/app/cli.py).
